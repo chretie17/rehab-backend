@@ -10,6 +10,7 @@ const chatRoutes = require('./Routes/ChatRoutes');
 const  RehabRoutes = require ('./Routes/rehabroutes');
 const helpRoutes = require('./Routes/HelpRoutes');
 const DashboardRoutes = require('./Routes/Dashboard');
+const reportRoutes = require('./Routes/ReportRoutes');
 
 const app = express();
 const server = http.createServer(app); // Create an HTTP server
@@ -31,6 +32,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/rehab', RehabRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/dashboard', DashboardRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Socket.IO setup
 io.on('connection', (socket) => {
