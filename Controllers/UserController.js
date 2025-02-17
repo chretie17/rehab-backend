@@ -127,7 +127,7 @@ exports.updateUser = (req, res) => {
 
   db.query(query, [first_name, last_name, gender, profession, national_id, address, rehab_reason, email, role, userId], (err, results) => {
     if (err) {
-      return res.status(500).json({ error: 'Error updating user' });
+      return res.status(500).json({ error: err });
     }
     res.status(200).json({ message: 'User updated successfully' });
   });
