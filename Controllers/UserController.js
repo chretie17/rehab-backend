@@ -62,7 +62,7 @@ exports.loginUser = (req, res) => {
 
       const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '12h' });
 
-      res.status(200).json({ message: 'Login successful', token, user: { id: user.id, username: user.username, role: user.role } });
+      res.status(200).json({ message: 'Login successful', token, user: { id: user.id, username: user.username, role: user.role,email:user.email } });
     } catch (compareError) {
       return res.status(500).json({ error: compareError.message });
     }
