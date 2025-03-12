@@ -29,8 +29,8 @@ exports.getAllPrograms = (req, res) => {
             programs.remarks,
             programs.created_at, 
             programs.updated_at,
-            u1.name AS created_by_name,
-            u2.name AS assigned_to_name
+            u1.first_name AS created_by_name,
+            u2.first_name AS assigned_to_name
         FROM programs
         LEFT JOIN users u1 ON programs.created_by = u1.id
         LEFT JOIN users u2 ON programs.assigned_to = u2.id
@@ -54,7 +54,7 @@ exports.getAllPrograms = (req, res) => {
 };
 // Backend: Controller to fetch all users with role 'participant'
 exports.getAllParticipants = (req, res) => {
-    const query = 'SELECT id, name FROM users WHERE role = "participant"';
+    const query = 'SELECT id, first_name,last_name FROM users WHERE role = "participant"';
 
     db.query(query, (err, results) => {
         if (err) {
@@ -116,8 +116,8 @@ exports.getProgramsByRole = (req, res) => {
         programs.remarks,
         programs.created_at, 
         programs.updated_at,
-        u1.name AS created_by_name,
-        u2.name AS assigned_to_name
+        u1.first_name AS created_by_name,
+        u2.first_name AS assigned_to_name
     FROM programs
     LEFT JOIN users u1 ON programs.created_by = u1.id
     LEFT JOIN users u2 ON programs.assigned_to = u2.id
@@ -164,7 +164,7 @@ exports.addParticipant = (req, res) => {
 
 // Get All Professionals
 exports.getAllProfessionals = (req, res) => {
-    const query = 'SELECT id, name FROM users WHERE role = "professional"';
+    const query = 'SELECT id, first_name ,last_name FROM users WHERE role = "professional"';
     db.query(query, (err, results) => {
         if (err) {
             return res.status(500).json({ error: 'Error fetching professionals' });

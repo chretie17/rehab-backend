@@ -2,38 +2,40 @@ const db = require('../db'); // MySQL connection
 
 // ✅ Create a New Rehabilitation Participant
 exports.createRehabParticipant = (req, res) => {
-  const { name, gender, age, condition, guardian_id, professional_id, admission_date, status, notes } = req.body;
+  const { first_name, last_name, gender, age, national_id, condition, guardian_id, professional_id, admission_date, status, notes, reason, time_period } = req.body;
 
-  if (!name || !gender || !age || !condition || !guardian_id || !professional_id || !admission_date || !status) {
-    return res.status(400).json({ error: 'All fields are required' });
+  if (!first_name || !last_name || !gender || !age || !condition || !guardian_id || !professional_id || !admission_date || !status || !reason || !time_period) {
+    return res.status(400).json({ error: 'All required fields must be provided' });
   }
+
+  // Set national_id to NULL if not provided
+  const nationalIdValue = national_id && national_id.trim() !== '' ? national_id : null;
 
   const query = `
     INSERT INTO rehab_participants 
-    (name, gender, age, \`condition\`, guardian_id, professional_id, admission_date, status, notes) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    (first_name, last_name, gender, age, national_id, \`condition\`, guardian_id, professional_id, admission_date, status, notes, reason, time_period) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  db.query(query, [name, gender, age, condition, guardian_id, professional_id, admission_date, status, notes], (err, results) => {
+  db.query(query, [first_name, last_name, gender, age, nationalIdValue, condition, guardian_id, professional_id, admission_date, status, notes, reason, time_period], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({ message: 'Rehabilitation participant added successfully' });
   });
 };
 
 
+
 // ✅ Fetch All Rehabilitation Participants with Their Assigned Guardian & Professional
 exports.getRehabParticipants = (req, res) => {
-    const query = `
-    SELECT rp.id, rp.name, rp.gender, rp.age, rp.\`condition\`, rp.admission_date, rp.status, rp.notes, 
-           g.name AS guardian_name, g.email AS guardian_email, g.username AS guardian_username,
-           p.name AS professional_name, p.email AS professional_email, p.profession
+  const query = `
+    SELECT rp.id, rp.first_name, rp.last_name, rp.gender, rp.age, rp.national_id, rp.condition, rp.admission_date, rp.status, rp.notes, rp.reason, rp.time_period,
+           g.first_name AS guardian_first_name, g.last_name AS guardian_last_name, g.email AS guardian_email,
+           p.first_name AS professional_first_name, p.last_name AS professional_last_name, p.email AS professional_email
     FROM rehab_participants rp
     JOIN users g ON rp.guardian_id = g.id
     JOIN users p ON rp.professional_id = p.id
     ORDER BY rp.admission_date DESC`;
-  
 
   db.query(query, (err, results) => {
-    if (err) {return results(err);}
     if (err) return res.status(500).json({ error: 'Error fetching rehabilitation participants' });
     res.status(200).json({ participants: results });
   });
@@ -44,10 +46,10 @@ exports.getRehabParticipantById = (req, res) => {
   const { id } = req.params;
 
   const query = `
-  SELECT rp.id, rp.name, rp.gender, rp.age, rp.\`condition\`, rp.admission_date, rp.status, 
+  SELECT rp.id, rp.first_name, rp.last_name, rp.gender, rp.age, rp.\`condition\`, rp.admission_date, rp.status, 
          COALESCE(rp.notes, '') AS notes,  -- ✅ Ensure notes is not NULL
-         g.name AS guardian_name, g.email AS guardian_email,
-         p.name AS professional_name, p.email AS professional_email
+         g.first_name AS guardian_first_name, g.last_name AS guardian_last_name, g.email AS guardian_email,
+         p.first_name AS professional_first_name, p.last_name AS professional_last_name, p.email AS professional_email
   FROM rehab_participants rp
   JOIN users g ON rp.guardian_id = g.id
   JOIN users p ON rp.professional_id = p.id
@@ -102,7 +104,7 @@ exports.deleteRehabParticipant = (req, res) => {
 };
 
 exports.getAllProfessionals = (req, res) => {
-    const query = `SELECT id, name, email, username, profession FROM users WHERE role = 'professional'`;
+    const query = `SELECT id, first_name, last_name, email, username, profession FROM users WHERE role = 'professional'`;
   
     db.query(query, (err, results) => {
       if (err) {
@@ -121,7 +123,7 @@ exports.getAllProfessionals = (req, res) => {
     });
   };
   exports.getAllGuardians = (req, res) => {
-    const query = `SELECT id, name, email, username FROM users WHERE role = 'participant'`;
+    const query = `SELECT id, first_name, last_name, email, username FROM users WHERE role = 'participant'`;
   
     db.query(query, (err, results) => {
       if (err) return res.status(500).json({ error: 'Error fetching guardians' });
@@ -133,53 +135,50 @@ exports.getAllProfessionals = (req, res) => {
 
   
   exports.updateRehabParticipant = (req, res) => {
-    const { participantId } = req.params;  // Ensure this is defined
+    const { participantId } = req.params;  
     const updateFields = req.body;
-  
-    console.log("🔍 Received update request for participantId:", participantId);
-    console.log("🔍 Update Fields:", updateFields);
-  
+
     if (!participantId) {
-      return res.status(400).json({ error: 'Participant ID is required' });
+        return res.status(400).json({ error: 'Participant ID is required' });
     }
-  
+
     if (!Object.keys(updateFields).length) {
-      return res.status(400).json({ error: 'No fields provided for update' });
+        return res.status(400).json({ error: 'No fields provided for update' });
     }
-  
-    // Dynamically generate SQL SET clause
-    const fields = Object.keys(updateFields).map(field => `\`${field}\` = ?`).join(', ');
+
+    // ✅ Ensure reserved keywords (like `condition`) are wrapped in backticks
+    const fields = Object.keys(updateFields)
+        .map(field => `\`${field}\` = ?`) 
+        .join(', ');
+
     const values = Object.values(updateFields);
-  
+    values.push(participantId); // Append participantId for WHERE clause
+
     const query = `UPDATE rehab_participants SET ${fields} WHERE id = ?`;
-    
-    values.push(participantId); // Append the participant ID to the query values
-  
-    console.log("✅ Executing Query:", query, "with values:", values);
-  
+
+    console.log("🚀 Executing Query:", query, "with values:", values); // ✅ Log SQL Query for debugging
+
     db.query(query, values, (err, results) => {
-      if (err) {
-        console.error("❌ Database Error:", err);
-        return res.status(500).json({ error: 'Error updating rehabilitation participant' });
-      }
-  
-      console.log("✅ Update Result:", results);
-      if (results.affectedRows === 0) {
-        return res.status(404).json({ error: 'No participant found with the provided ID' });
-      }
-  
-      res.status(200).json({ message: 'Rehabilitation participant updated successfully' });
+        if (err) {
+            console.error("❌ Database Error:", err);
+            return res.status(500).json({ error: 'Error updating rehabilitation participant' });
+        }
+
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: 'No participant found with the provided ID' });
+        }
+
+        res.status(200).json({ message: 'Rehabilitation participant updated successfully' });
     });
-  };
-  
+};
 
   
   exports.getAssignedParticipants = (req, res) => {
     const { professionalId } = req.params;
   
     const query = `
-      SELECT rp.id, rp.name, rp.gender, rp.age, rp.\`condition\`, rp.admission_date, rp.status, rp.notes,
-             g.name AS guardian_name, g.email AS guardian_email, g.username AS guardian_username
+      SELECT rp.id, rp.first_name, rp.last_name, rp.gender, rp.age, rp.\`condition\`, rp.admission_date, rp.status, rp.notes,
+             g.first_name AS guardian_first_name, g.last_name AS guardian_last_name, g.email AS guardian_email, g.username AS guardian_username
       FROM rehab_participants rp
       JOIN users g ON rp.guardian_id = g.id
       WHERE rp.professional_id = ?`;
@@ -214,7 +213,7 @@ exports.getParticipantsByGuardian = (req, res) => {
   }
 
   const query = `
-    SELECT rp.id, rp.name, rp.gender, rp.age, rp.\`condition\`, rp.status, rp.admission_date
+    SELECT rp.id, rp.first_name, rp.last_name, rp.gender, rp.age, rp.\`condition\`, rp.status, rp.admission_date
     FROM rehab_participants rp
     WHERE rp.guardian_id = ?`;
 

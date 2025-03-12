@@ -8,7 +8,8 @@ const JWT_SECRET = 'c23db8c3f447c41e4e6504c8f546326a533b7ec4a86fa0e4dcc78cb4ee56
 
 exports.registerUser = (req, res) => {
   const {
-    name,
+    first_name,
+    last_name,
     gender = null,
     profession = null,
     national_id = null,
@@ -20,18 +21,18 @@ exports.registerUser = (req, res) => {
     role
   } = req.body;
 
-  if (!name || !email || !username || !password || !role) {
-    return res.status(400).json({ error: 'Name, email, username, password, and role are required' });
+  if (!first_name || !last_name || !email || !username || !password || !role) {
+    return res.status(400).json({ error: 'First name, last name, email, username, password, and role are required' });
   }
 
   bcrypt.hash(password, 10, (err, hashedPassword) => {
     if (err) return res.status(500).json({ error: 'Error hashing password' });
 
     const query = `INSERT INTO users 
-      (name, gender, profession, national_id, address, rehab_reason, email, username, password, role, verified) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      (first_name, last_name, gender, profession, national_id, address, rehab_reason, email, username, password, role, verified) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-    db.query(query, [name, gender, profession, national_id, address, rehab_reason, email, username, hashedPassword, role, false], (err, results) => {
+    db.query(query, [first_name, last_name, gender, profession, national_id, address, rehab_reason, email, username, hashedPassword, role, false], (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({ message: 'User registered successfully. Waiting for admin verification.' });
     });
@@ -88,28 +89,25 @@ exports.getUserById = (req, res) => {
 // Get All Users
 // Get All Users
 exports.getAllUsers = (req, res) => {
-  const query = `SELECT id, first_name, last_name, gender, profession, national_id, address, rehab_reason, email, username,verified, role FROM users`;
+  const query = `SELECT id, first_name, last_name, gender, profession, national_id, address, rehab_reason, email, username, verified, role FROM users`;
 
   db.query(query, (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: 'Error retrieving users' });
-    }
-    if (results.length === 0) {
-      return res.status(404).json({ message: 'No users found' });
-    }
+    if (err) return res.status(500).json({ error: 'Error retrieving users' });
+    if (results.length === 0) return res.status(404).json({ message: 'No users found' });
     res.status(200).json({ users: results });
   });
 };
+
 
 // Update User
 // Update User
 exports.updateUser = (req, res) => {
   const userId = req.params.id;
   const {
-    first_name = null,
-    last_name = null,
-    gender = null, // New field
-    profession = null, // New field
+    first_name,
+    last_name,
+    gender = null,
+    profession = null,
     national_id = null,
     address = null,
     rehab_reason = null,
@@ -117,8 +115,8 @@ exports.updateUser = (req, res) => {
     role
   } = req.body;
 
-  if (!email || !role) {
-    return res.status(400).json({ error: 'Email and role are required' });
+  if (!first_name || !last_name || !email || !role) {
+    return res.status(400).json({ error: 'First name, last name, email, and role are required' });
   }
 
   const query = `UPDATE users SET 
@@ -126,9 +124,7 @@ exports.updateUser = (req, res) => {
     WHERE id = ?`;
 
   db.query(query, [first_name, last_name, gender, profession, national_id, address, rehab_reason, email, role, userId], (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err });
-    }
+    if (err) return res.status(500).json({ error: err.message });
     res.status(200).json({ message: 'User updated successfully' });
   });
 };
@@ -239,7 +235,7 @@ exports.getProfessionalDetails = (req, res) => {
     return res.status(403).json({ error: 'Access denied. Only professionals can view their details.' });
   }
 
-  const query = `SELECT name, role, profession, email, username, gender FROM users WHERE id = ? LIMIT 1`;
+  const query = `SELECT first_name,last_name, role, profession, email, username, gender FROM users WHERE id = ? LIMIT 1`;
 
   db.query(query, [id], (err, results) => {
     if (err) {
@@ -253,7 +249,7 @@ exports.getProfessionalDetails = (req, res) => {
 };
 
 exports.getAllGuardians = (req, res) => {
-  const query = `SELECT id, name, email, username FROM users WHERE role = 'participant'`;
+  const query = `SELECT id, fisrt_name,last_name, email, username FROM users WHERE role = 'participant'`;
 
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ error: 'Error fetching guardians' });
@@ -263,7 +259,7 @@ exports.getAllGuardians = (req, res) => {
 };
 
 exports.getAllProfessionals = (req, res) => {
-  const query = `SELECT id, name, email, username, profession FROM users WHERE role = 'professional'`;
+  const query = `SELECT id, first_name,last_name, email, username, profession FROM users WHERE role = 'professional'`;
 
   db.query(query, (err, results) => {
     if (err) {

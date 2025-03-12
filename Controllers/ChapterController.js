@@ -230,7 +230,7 @@ exports.getProgressForProgram = (req, res) => {
     const query = `
         SELECT 
             cp.id AS progress_id,
-            u.name AS participant_name,
+            u.first_name AS participant_name,
             c.name AS chapter_name,
             c.description AS chapter_description,
             cp.status,
@@ -240,7 +240,7 @@ exports.getProgressForProgram = (req, res) => {
         JOIN users u ON cp.user_id = u.id
         JOIN chapters c ON cp.chapter_id = c.id
         WHERE cp.program_id = ?
-        ORDER BY u.name, c.chapter_order;
+        ORDER BY u.first_name, c.chapter_order;
     `;
 
     db.query(query, [program_id], (err, results) => {

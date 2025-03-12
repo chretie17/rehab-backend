@@ -2,7 +2,7 @@
 const db = require('../db'); // MySQL connection
 
 exports.getAllProfessionals = (req, res) => {
-    const query = `SELECT id, name, email, username, profession FROM users WHERE role = 'professional'`;
+    const query = `SELECT id, first_name, email, username, profession FROM users WHERE role = 'professional'`;
   
     db.query(query, (err, results) => {
       if (err) {

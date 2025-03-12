@@ -25,7 +25,7 @@ exports.getSystemSummary = (req, res) => {
 exports.getProfessionalReport = (req, res) => {
     const query = `
         SELECT 
-            u.id, u.name, u.email, u.profession, 
+            u.id, u.first_name, u.last_name, u.email, u.profession, 
             COUNT(DISTINCT rp.id) AS total_participants,
             SUM(CASE WHEN rp.status = 'Active' THEN 1 ELSE 0 END) AS active_participants,
             SUM(CASE WHEN rp.status = 'Discharged' THEN 1 ELSE 0 END) AS discharged_participants,
@@ -51,20 +51,20 @@ exports.getProfessionalReport = (req, res) => {
 exports.getGuardianReport = (req, res) => {
     const query = `
         SELECT 
-            u.id AS guardian_id, u.name AS guardian_name, u.email, 
+            u.id AS guardian_id, u.first_name, u.last_name AS guardian_name, u.email, 
             COUNT(DISTINCT hr.id) AS total_help_requests,
             COUNT(DISTINCT rp.id) AS total_guardian_participants,
-            rp.id AS participant_id, rp.name AS participant_name, rp.gender, rp.age, rp.condition, rp.status
+            rp.id AS participant_id, rp.first_name AS participant_name, rp.gender, rp.age, rp.condition, rp.status
         FROM users u
         LEFT JOIN help_requests hr ON u.id = hr.guardian_id
         LEFT JOIN rehab_participants rp ON u.id = rp.guardian_id
         WHERE u.role = 'participant'
         GROUP BY u.id, rp.id
-        ORDER BY u.name, rp.name;
+        ORDER BY u.first_name, rp.first_name;
     `;
 
     db.query(query, (err, results) => {
-        if (err) return res.status(500).json({ error: "Error fetching guardian report" });
+        if (err) return res.status(500).json({ error: err });
 
         // ✅ Restructure Data: Group Participants Under Their Guardians
         const guardians = {};
@@ -100,7 +100,7 @@ exports.getGuardianReport = (req, res) => {
 // ✅ Get ALL Guardian Participants
 exports.getGuardianParticipants = (req, res) => {
     const query = `
-        SELECT rp.id, rp.name, rp.gender, rp.age, rp.condition, rp.status, rp.admission_date,
+        SELECT rp.id, rp.first_name, rp.gender, rp.age, rp.condition, rp.status, rp.admission_date,
                p.name AS professional_name, rp.guardian_id
         FROM rehab_participants rp
         LEFT JOIN users p ON rp.professional_id = p.id
@@ -158,7 +158,7 @@ exports.getChapterProgressForDateRange = (req, res) => {
     let { startDate, endDate } = req.query;
 
     let query = `
-        SELECT cp.id AS progress_id, c.name AS chapter_name, u.name AS participant_name,
+        SELECT cp.id AS progress_id, c.name AS chapter_name, u.first_name AS participant_name,
                cp.status, cp.remarks, cp.updated_at
         FROM chapter_progress cp
         JOIN chapters c ON cp.chapter_id = c.id
