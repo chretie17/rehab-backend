@@ -22,8 +22,8 @@ exports.sendEmailToGuardian = (req, res) => {
   const query = `
     SELECT 
       g.email AS guardian_email,
-      g.name AS guardian_name,
-      p.name AS professional_name
+      g.first_name AS guardian_name,
+      p.first_name AS professional_name
     FROM users g
     JOIN users p ON p.id = ?  -- Professional ID
     WHERE g.id = ?;  -- Guardian ID

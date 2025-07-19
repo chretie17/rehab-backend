@@ -101,7 +101,7 @@ exports.getGuardianReport = (req, res) => {
 exports.getGuardianParticipants = (req, res) => {
     const query = `
         SELECT rp.id, rp.first_name, rp.gender, rp.age, rp.condition, rp.status, rp.admission_date,
-               p.name AS professional_name, rp.guardian_id
+               p.first_name AS professional_name, rp.guardian_id
         FROM rehab_participants rp
         LEFT JOIN users p ON rp.professional_id = p.id
         ORDER BY rp.admission_date DESC;

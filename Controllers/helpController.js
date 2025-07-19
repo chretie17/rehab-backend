@@ -22,7 +22,7 @@ exports.getGuardianHelpRequests = (req, res) => {
 
     const query = `
         SELECT hr.id, hr.request, hr.status, hr.notes, hr.created_at, 
-               p.name AS participant_name
+               p.first_name AS participant_name
         FROM help_requests hr
         JOIN rehab_participants p ON hr.participant_id = p.id
         WHERE hr.guardian_id = ?
@@ -41,7 +41,7 @@ exports.getGuardianHelpRequests = (req, res) => {
 exports.getAllHelpRequests = (req, res) => {
     const query = `
         SELECT hr.id, hr.request, hr.status, hr.created_at,
-               g.name AS guardian_name, p.name AS participant_name
+               g.first_name AS guardian_name, p.first_name AS participant_name
         FROM help_requests hr
         JOIN users g ON hr.guardian_id = g.id
         JOIN rehab_participants p ON hr.participant_id = p.id
@@ -84,9 +84,9 @@ exports.updateHelpRequestStatus = (req, res) => {
 exports.getAllHelpRequests = (req, res) => {
     const query = `
         SELECT hr.id, hr.participant_id, hr.guardian_id, hr.request, hr.status, hr.notes, hr.created_at,
-               g.name AS guardian_name, g.email AS guardian_email,
-               p.name AS participant_name, p.age, p.condition,
-               pr.name AS professional_name
+               g.first_name AS guardian_name, g.email AS guardian_email,
+               p.first_name AS participant_name, p.age, p.condition,
+               pr.first_name AS professional_name
         FROM help_requests hr
         JOIN users g ON hr.guardian_id = g.id
         JOIN rehab_participants p ON hr.participant_id = p.id
