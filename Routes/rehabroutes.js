@@ -13,6 +13,11 @@ router.get('/guardians', rehabController.getAllGuardians);
 router.put('/participants/:participantId', rehabController.updateRehabParticipant);
 router.get('/assigned/:professionalId', rehabController.getAssignedParticipants); // ✅ Get assigned rehab participants
 router.put('/update-status/:participantId', rehabController.updateParticipantStatus); // ✅ Update participant status
-router.get('/guardians/:guardianId/participants', rehabController.getParticipantsByGuardian);
+
+// ✅ Route for Guardian to see all their participants
+router.get('/guardian/:guardianId/participants', rehabController.getParticipantsByGuardian);
+
+// ✅ Route for Guardian to see detailed progress of a specific participant
+router.get('/guardian/participant/:participantId/progress', rehabController.getParticipantProgress);
 
 module.exports = router;

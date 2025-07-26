@@ -205,6 +205,7 @@ exports.getAllProfessionals = (req, res) => {
 
     
 
+// ✅ Enhanced function for Guardian to see their participants and their progress
 exports.getParticipantsByGuardian = (req, res) => {
   const { guardianId } = req.params;
 
@@ -213,9 +214,34 @@ exports.getParticipantsByGuardian = (req, res) => {
   }
 
   const query = `
-    SELECT rp.id, rp.first_name, rp.last_name, rp.gender, rp.age, rp.\`condition\`, rp.status, rp.admission_date
+    SELECT 
+      rp.id, 
+      rp.first_name, 
+      rp.last_name, 
+      rp.gender, 
+      rp.age, 
+      rp.national_id,
+      rp.\`condition\`, 
+      rp.status, 
+      rp.admission_date,
+      rp.time_period,
+      rp.reason,
+      COALESCE(rp.notes, '') AS notes,
+      p.first_name AS professional_first_name, 
+      p.last_name AS professional_last_name, 
+      p.email AS professional_email,
+      p.profession,
+      DATEDIFF(CURDATE(), rp.admission_date) AS days_in_rehab,
+      CASE 
+        WHEN rp.status = 'Discharged' THEN '✅ Rehabilitation Completed'
+        WHEN rp.status = 'Active' THEN '🔄 Currently Active' 
+        WHEN rp.status = 'Transferred' THEN '📋 Transferred to Another Facility'
+        ELSE '📝 Status Unknown'
+      END AS status_display
     FROM rehab_participants rp
-    WHERE rp.guardian_id = ?`;
+    LEFT JOIN users p ON rp.professional_id = p.id
+    WHERE rp.guardian_id = ?
+    ORDER BY rp.admission_date DESC`;
 
   db.query(query, [guardianId], (err, results) => {
     if (err) {
@@ -224,9 +250,130 @@ exports.getParticipantsByGuardian = (req, res) => {
     }
 
     if (results.length === 0) {
-      return res.status(404).json({ message: 'No participants found for this guardian' });
+      return res.status(200).json({ 
+        message: 'No participants found for this guardian',
+        participants: []
+      });
     }
 
-    res.status(200).json({ participants: results });
+    // ✅ Add progress calculation and additional insights
+    const enhancedResults = results.map(participant => {
+      const progressPercentage = calculateProgressPercentage(participant.status, participant.days_in_rehab, participant.time_period);
+      
+      return {
+        ...participant,
+        progress_percentage: progressPercentage,
+        is_overdue: participant.days_in_rehab > participant.time_period && participant.status === 'Active',
+        time_remaining: Math.max(0, participant.time_period - participant.days_in_rehab),
+        professional_info: {
+          name: `${participant.professional_first_name || 'Not'} ${participant.professional_last_name || 'Assigned'}`,
+          email: participant.professional_email || 'N/A',
+          profession: participant.profession || 'N/A'
+        }
+      };
+    });
+
+    res.status(200).json({ 
+      participants: enhancedResults,
+      total_participants: enhancedResults.length,
+              summary: {
+        active: enhancedResults.filter(p => p.status === 'Active').length,
+        discharged: enhancedResults.filter(p => p.status === 'Discharged').length,
+        transferred: enhancedResults.filter(p => p.status === 'Transferred').length,
+        overdue: enhancedResults.filter(p => p.is_overdue).length
+      }
+    });
+  });
+};
+
+// ✅ Helper function to calculate progress percentage
+function calculateProgressPercentage(status, daysInRehab, timePeriod) {
+  if (status === 'Discharged') return 100;
+  if (status === 'Transferred') return Math.min(100, Math.round((daysInRehab / timePeriod) * 100));
+  if (timePeriod <= 0) return 0;
+  
+  const progress = Math.min(100, Math.round((daysInRehab / timePeriod) * 100));
+  return Math.max(0, progress);
+}
+
+// ✅ Get detailed progress for a specific participant (Guardian view)
+exports.getParticipantProgress = (req, res) => {
+  const { participantId } = req.params;
+  const { guardianId } = req.query; // To ensure guardian can only see their own participants
+
+  if (!participantId) {
+    return res.status(400).json({ error: 'Participant ID is required' });
+  }
+
+  const query = `
+    SELECT 
+      rp.id, 
+      rp.first_name, 
+      rp.last_name, 
+      rp.gender, 
+      rp.age, 
+      rp.\`condition\`, 
+      rp.status, 
+      rp.admission_date,
+      rp.time_period,
+      rp.reason,
+      rp.notes,
+      p.first_name AS professional_first_name, 
+      p.last_name AS professional_last_name, 
+      p.email AS professional_email,
+      p.profession,
+      DATEDIFF(CURDATE(), rp.admission_date) AS days_in_rehab
+    FROM rehab_participants rp
+    LEFT JOIN users p ON rp.professional_id = p.id
+    WHERE rp.id = ? ${guardianId ? 'AND rp.guardian_id = ?' : ''}`;
+
+  const queryParams = guardianId ? [participantId, guardianId] : [participantId];
+
+  db.query(query, queryParams, (err, results) => {
+    if (err) {
+      console.error('❌ Database Error:', err);
+      return res.status(500).json({ error: 'Error fetching participant progress' });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Participant not found or access denied' });
+    }
+
+    const participant = results[0];
+    const progressPercentage = calculateProgressPercentage(participant.status, participant.days_in_rehab, participant.time_period);
+
+    // ✅ Calculate expected completion date safely
+    const timeRemaining = Math.max(0, participant.time_period - participant.days_in_rehab);
+    let expectedCompletionDate;
+    
+    try {
+      if (participant.status === 'Discharged') {
+        expectedCompletionDate = 'Completed';
+      } else if (participant.status === 'Transferred') {
+        expectedCompletionDate = 'Transferred';
+      } else if (timeRemaining <= 0) {
+        expectedCompletionDate = 'Overdue';
+      } else {
+        const completionTimestamp = Date.now() + (timeRemaining * 24 * 60 * 60 * 1000);
+        expectedCompletionDate = new Date(completionTimestamp).toISOString().split('T')[0];
+      }
+    } catch (error) {
+      expectedCompletionDate = 'Unknown';
+    }
+
+    const enhancedParticipant = {
+      ...participant,
+      progress_percentage: progressPercentage,
+      is_overdue: participant.days_in_rehab > participant.time_period && participant.status === 'Active',
+      time_remaining: timeRemaining,
+      expected_completion_date: expectedCompletionDate,
+      professional_info: {
+        name: `${participant.professional_first_name || 'Not'} ${participant.professional_last_name || 'Assigned'}`,
+        email: participant.professional_email || 'N/A',
+        profession: participant.profession || 'N/A'
+      }
+    };
+
+    res.status(200).json({ participant: enhancedParticipant });
   });
 };
