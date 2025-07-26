@@ -36,6 +36,8 @@ app.use('/api/dashboard', DashboardRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/email', emailRoutes);
 
+app.use('/api/participant-report', require('./Routes/participantreport'));
+
 // Socket.IO setup
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);

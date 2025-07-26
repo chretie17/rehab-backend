@@ -34,6 +34,104 @@ exports.registerUser = (req, res) => {
 
     db.query(query, [first_name, last_name, gender, profession, national_id, address, rehab_reason, email, username, hashedPassword, role, false], (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
+
+      // Send admin notification email
+      const adminEmail = 'ishimweimmacule46@gmail.com';
+      const adminMailOptions = {
+        from: '"RehabCenter System" <turachretien@gmail.com>', // This shows "RehabCenter System" instead of email
+        to: adminEmail,
+        subject: '🔔 New User Registration - Verification Required',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
+              <h1 style="color: white; margin: 0; font-size: 28px;">🏥 RehabCenter</h1>
+              <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">Admin Notification System</p>
+            </div>
+            
+            <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <h2 style="color: #2d3748; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">
+                📋 New User Registration
+              </h2>
+              
+              <p style="color: #4a5568; font-size: 16px; line-height: 1.6;">
+                A new user has registered and is waiting for your verification approval.
+              </p>
+              
+              <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4299e1;">
+                <h3 style="color: #2d3748; margin-top: 0;">👤 User Details:</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #4a5568;">Name:</td>
+                    <td style="padding: 8px 0; color: #2d3748;">${first_name} ${last_name}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #4a5568;">Email:</td>
+                    <td style="padding: 8px 0; color: #2d3748;">${email}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #4a5568;">Username:</td>
+                    <td style="padding: 8px 0; color: #2d3748;">${username}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #4a5568;">Role:</td>
+                    <td style="padding: 8px 0; color: #2d3748; text-transform: capitalize;">${role}</td>
+                  </tr>
+                  ${profession ? `
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #4a5568;">Profession:</td>
+                    <td style="padding: 8px 0; color: #2d3748;">${profession}</td>
+                  </tr>
+                  ` : ''}
+                  ${gender ? `
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; font-weight: bold; color: #4a5568;">Gender:</td>
+                    <td style="padding: 8px 0; color: #2d3748; text-transform: capitalize;">${gender}</td>
+                  </tr>
+                  ` : ''}
+                  ${rehab_reason ? `
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #4a5568;">Rehab Reason:</td>
+                    <td style="padding: 8px 0; color: #2d3748;">${rehab_reason}</td>
+                  </tr>
+                  ` : ''}
+                </table>
+              </div>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <p style="color: #718096; margin-bottom: 20px;">
+                  Please log in to the admin panel to verify this user's account.
+                </p>
+                <a href="http://localhost:5173/admin/dashboard" 
+                   style="display: inline-block; background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); 
+                          color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; 
+                          font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  🔗 Go to Admin Panel
+                </a>
+              </div>
+              
+              <div style="background: #fff5f5; border: 1px solid #fed7d7; border-radius: 6px; padding: 15px; margin-top: 20px;">
+                <p style="color: #c53030; margin: 0; font-size: 14px;">
+                  ⚠️ <strong>Action Required:</strong> This user cannot access their account until you approve their registration.
+                </p>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding: 20px; color: #718096; font-size: 14px;">
+              <p style="margin: 0;">RehabCenter Admin System</p>
+              <p style="margin: 5px 0 0 0;">This is an automated notification email.</p>
+            </div>
+          </div>
+        `
+      };
+
+      transporter.sendMail(adminMailOptions, (mailErr, info) => {
+        if (mailErr) {
+          console.error('Error sending admin notification email:', mailErr);
+        } else {
+          console.log('Admin notification email sent successfully');
+        }
+      });
+
       res.status(201).json({ message: 'User registered successfully. Waiting for admin verification.' });
     });
   });
@@ -161,7 +259,7 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'turachretien@gmail.com', // Replace with your email
-    pass: 'ruix vmny qntx ywos' // Replace with your app password
+    pass: 'aqtl qtnt fhzr toyy' // Replace with your app password
   }
 });
 
