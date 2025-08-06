@@ -2,26 +2,31 @@ const db = require('../db'); // MySQL connection
 
 // ✅ Create a New Rehabilitation Participant
 exports.createRehabParticipant = (req, res) => {
-  const { first_name, last_name, gender, age, national_id, condition, guardian_id, professional_id, admission_date, status, notes, reason, time_period } = req.body;
+  const { 
+    first_name, last_name, gender, age, national_id, condition, 
+    guardian_id, professional_id, counselor_id, // ✅ Add counselor_id
+    admission_date, status, notes, reason, time_period 
+  } = req.body;
 
+  // Update validation (counselor_id is optional)
   if (!first_name || !last_name || !gender || !age || !condition || !guardian_id || !professional_id || !admission_date || !status || !reason || !time_period) {
     return res.status(400).json({ error: 'All required fields must be provided' });
   }
 
-  // Set national_id to NULL if not provided
-  const nationalIdValue = national_id && national_id.trim() !== '' ? national_id : null;
+  // Handle optional counselor_id
+  const counselorIdValue = counselor_id && counselor_id.trim() !== '' ? counselor_id : null;
 
+  // Update INSERT query
   const query = `
     INSERT INTO rehab_participants 
-    (first_name, last_name, gender, age, national_id, \`condition\`, guardian_id, professional_id, admission_date, status, notes, reason, time_period) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    (first_name, last_name, gender, age, national_id, \`condition\`, guardian_id, professional_id, counselor_id, admission_date, status, notes, reason, time_period) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  db.query(query, [first_name, last_name, gender, age, nationalIdValue, condition, guardian_id, professional_id, admission_date, status, notes, reason, time_period], (err, results) => {
+  db.query(query, [first_name, last_name, gender, age, nationalIdValue, condition, guardian_id, professional_id, counselorIdValue, admission_date, status, notes, reason, time_period], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({ message: 'Rehabilitation participant added successfully' });
   });
 };
-
 
 
 // ✅ Fetch All Rehabilitation Participants with Their Assigned Guardian & Professional
@@ -29,10 +34,12 @@ exports.getRehabParticipants = (req, res) => {
   const query = `
     SELECT rp.id, rp.first_name, rp.last_name, rp.gender, rp.age, rp.national_id, rp.condition, rp.admission_date, rp.status, rp.notes, rp.reason, rp.time_period,
            g.first_name AS guardian_first_name, g.last_name AS guardian_last_name, g.email AS guardian_email,
-           p.first_name AS professional_first_name, p.last_name AS professional_last_name, p.email AS professional_email
+           p.first_name AS professional_first_name, p.last_name AS professional_last_name, p.email AS professional_email,
+           c.first_name AS counselor_first_name, c.last_name AS counselor_last_name, c.email AS counselor_email
     FROM rehab_participants rp
     JOIN users g ON rp.guardian_id = g.id
     JOIN users p ON rp.professional_id = p.id
+    LEFT JOIN users c ON rp.counselor_id = c.id
     ORDER BY rp.admission_date DESC`;
 
   db.query(query, (err, results) => {
@@ -40,6 +47,7 @@ exports.getRehabParticipants = (req, res) => {
     res.status(200).json({ participants: results });
   });
 };
+
 
 // ✅ Fetch a Single Rehabilitation Participant by ID
 exports.getRehabParticipantById = (req, res) => {
@@ -132,7 +140,15 @@ exports.getAllProfessionals = (req, res) => {
     });
   };
 
-
+exports.getAllConselors = (req, res) => {
+    const query = `SELECT id, first_name, last_name, email, username FROM users WHERE role = 'counselor'`;
+  
+    db.query(query, (err, results) => {
+      if (err) return res.status(500).json({ error: 'Error fetching guardians' });
+      if (results.length === 0) return res.status(404).json({ message: 'No counselors found' });
+      res.status(200).json({ counselors: results });
+    });
+  };
   
   exports.updateRehabParticipant = (req, res) => {
     const { participantId } = req.params;  
@@ -207,10 +223,10 @@ exports.getAllProfessionals = (req, res) => {
 
 // ✅ Enhanced function for Guardian to see their participants and their progress
 exports.getParticipantsByGuardian = (req, res) => {
-  const { guardianId } = req.params;
-
+  const { guardianId } = req.params; // This will be treated as either guardian or counselor ID
+  
   if (!guardianId) {
-    return res.status(400).json({ error: 'Guardian ID is required' });
+    return res.status(400).json({ error: 'ID is required' });
   }
 
   const query = `
@@ -240,18 +256,18 @@ exports.getParticipantsByGuardian = (req, res) => {
       END AS status_display
     FROM rehab_participants rp
     LEFT JOIN users p ON rp.professional_id = p.id
-    WHERE rp.guardian_id = ?
+    WHERE rp.guardian_id = ? OR rp.counselor_id = ?
     ORDER BY rp.admission_date DESC`;
 
-  db.query(query, [guardianId], (err, results) => {
+  db.query(query, [guardianId, guardianId], (err, results) => {
     if (err) {
       console.error('❌ Database Error:', err);
       return res.status(500).json({ error: 'Error fetching participants' });
     }
 
     if (results.length === 0) {
-      return res.status(200).json({ 
-        message: 'No participants found for this guardian',
+      return res.status(200).json({
+        message: 'No participants found for this guardian or counselor',
         participants: []
       });
     }
@@ -273,10 +289,10 @@ exports.getParticipantsByGuardian = (req, res) => {
       };
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       participants: enhancedResults,
       total_participants: enhancedResults.length,
-              summary: {
+      summary: {
         active: enhancedResults.filter(p => p.status === 'Active').length,
         discharged: enhancedResults.filter(p => p.status === 'Discharged').length,
         transferred: enhancedResults.filter(p => p.status === 'Transferred').length,

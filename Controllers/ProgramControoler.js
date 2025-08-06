@@ -54,12 +54,12 @@ exports.getAllPrograms = (req, res) => {
 };
 // Backend: Controller to fetch all users with role 'participant'
 exports.getAllParticipants = (req, res) => {
-    const query = 'SELECT id, first_name,last_name FROM users WHERE role = "participant"';
-
+    const query = 'SELECT id, first_name, last_name, role FROM users WHERE role IN ("participant", "counselor") ORDER BY first_name, last_name';
+    
     db.query(query, (err, results) => {
         if (err) {
-            console.error('Error fetching participants:', err);
-            return res.status(500).json({ error: 'Error fetching participants' });
+            console.error('Error fetching participants and counselors:', err);
+            return res.status(500).json({ error: 'Error fetching participants and counselors' });
         }
         res.status(200).json(results);
     });

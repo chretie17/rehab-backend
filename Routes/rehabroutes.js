@@ -10,6 +10,7 @@ router.put('/update-status', rehabController.updateRehabStatus);
 router.delete('/participant/:id', rehabController.deleteRehabParticipant);
 router.get('/professionals', rehabController.getAllProfessionals);
 router.get('/guardians', rehabController.getAllGuardians);
+router.get('/counselors', rehabController.getAllConselors); // ✅ Get all counselors
 router.put('/participants/:participantId', rehabController.updateRehabParticipant);
 router.get('/assigned/:professionalId', rehabController.getAssignedParticipants); // ✅ Get assigned rehab participants
 router.put('/update-status/:participantId', rehabController.updateParticipantStatus); // ✅ Update participant status
