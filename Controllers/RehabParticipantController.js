@@ -315,51 +315,95 @@ function calculateProgressPercentage(status, daysInRehab, timePeriod) {
 // ✅ Get detailed progress for a specific participant (Guardian view)
 exports.getParticipantProgress = (req, res) => {
   const { participantId } = req.params;
-  const { guardianId } = req.query; // To ensure guardian can only see their own participants
-
+  const { guardianId } = req.query; // This could be either guardian or counselor ID
+  
   if (!participantId) {
     return res.status(400).json({ error: 'Participant ID is required' });
   }
-
+  
+  // Modified query to check BOTH guardian_id AND counselor_id
   const query = `
-    SELECT 
-      rp.id, 
-      rp.first_name, 
-      rp.last_name, 
-      rp.gender, 
-      rp.age, 
-      rp.\`condition\`, 
-      rp.status, 
+    SELECT
+      rp.id,
+      rp.first_name,
+      rp.last_name,
+      rp.gender,
+      rp.age,
+      rp.\`condition\`,
+      rp.status,
       rp.admission_date,
       rp.time_period,
       rp.reason,
       rp.notes,
-      p.first_name AS professional_first_name, 
-      p.last_name AS professional_last_name, 
+      rp.guardian_id,
+      rp.counselor_id,
+      p.first_name AS professional_first_name,
+      p.last_name AS professional_last_name,
       p.email AS professional_email,
       p.profession,
       DATEDIFF(CURDATE(), rp.admission_date) AS days_in_rehab
     FROM rehab_participants rp
     LEFT JOIN users p ON rp.professional_id = p.id
-    WHERE rp.id = ? ${guardianId ? 'AND rp.guardian_id = ?' : ''}`;
-
-  const queryParams = guardianId ? [participantId, guardianId] : [participantId];
-
+    WHERE rp.id = ? ${guardianId ? 'AND (rp.guardian_id = ? OR rp.counselor_id = ?)' : ''}`;
+    
+  // If guardianId is provided, check both guardian_id and counselor_id
+  const queryParams = guardianId ? [participantId, guardianId, guardianId] : [participantId];
+  
   db.query(query, queryParams, (err, results) => {
     if (err) {
       console.error('❌ Database Error:', err);
       return res.status(500).json({ error: 'Error fetching participant progress' });
     }
-
+    
     if (results.length === 0) {
       return res.status(404).json({ error: 'Participant not found or access denied' });
     }
-
+    
     const participant = results[0];
-    const progressPercentage = calculateProgressPercentage(participant.status, participant.days_in_rehab, participant.time_period);
-
-    // ✅ Calculate expected completion date safely
-    const timeRemaining = Math.max(0, participant.time_period - participant.days_in_rehab);
+    
+    // Helper function to parse time period
+    const parseTimePeriodToDays = (timePeriod) => {
+      if (!timePeriod || typeof timePeriod !== 'string') {
+        return null;
+      }
+      
+      const timePeriodLower = timePeriod.toLowerCase().trim();
+      const match = timePeriodLower.match(/(\d+)\s*(day|days|week|weeks|month|months|year|years)/);
+      
+      if (!match) {
+        return null;
+      }
+      
+      const number = parseInt(match[1]);
+      const unit = match[2];
+      
+      switch (unit) {
+        case 'day':
+        case 'days':
+          return number;
+        case 'week':
+        case 'weeks':
+          return number * 7;
+        case 'month':
+        case 'months':
+          return number * 30;
+        case 'year':
+        case 'years':
+          return number * 365;
+        default:
+          return null;
+      }
+    };
+    
+    const timePeriodInDays = parseTimePeriodToDays(participant.time_period);
+    
+    let progressPercentage = null;
+    if (timePeriodInDays && timePeriodInDays > 0) {
+      progressPercentage = Math.min(100, Math.round((participant.days_in_rehab / timePeriodInDays) * 100));
+    }
+    
+    const timeRemaining = timePeriodInDays ? Math.max(0, timePeriodInDays - participant.days_in_rehab) : null;
+    
     let expectedCompletionDate;
     
     try {
@@ -367,6 +411,8 @@ exports.getParticipantProgress = (req, res) => {
         expectedCompletionDate = 'Completed';
       } else if (participant.status === 'Transferred') {
         expectedCompletionDate = 'Transferred';
+      } else if (!timePeriodInDays) {
+        expectedCompletionDate = 'Unknown';
       } else if (timeRemaining <= 0) {
         expectedCompletionDate = 'Overdue';
       } else {
@@ -376,20 +422,29 @@ exports.getParticipantProgress = (req, res) => {
     } catch (error) {
       expectedCompletionDate = 'Unknown';
     }
-
+    
+    const isOverdue = timePeriodInDays && 
+                     participant.days_in_rehab > timePeriodInDays && 
+                     participant.status === 'Active';
+    
+    // Determine the user's relationship to the participant
+    const userRole = guardianId == participant.guardian_id ? 'guardian' : 'counselor';
+    
     const enhancedParticipant = {
       ...participant,
       progress_percentage: progressPercentage,
-      is_overdue: participant.days_in_rehab > participant.time_period && participant.status === 'Active',
+      is_overdue: isOverdue || false,
       time_remaining: timeRemaining,
       expected_completion_date: expectedCompletionDate,
+      time_period_in_days: timePeriodInDays,
+      user_role: userRole, // Add this to show the relationship
       professional_info: {
         name: `${participant.professional_first_name || 'Not'} ${participant.professional_last_name || 'Assigned'}`,
         email: participant.professional_email || 'N/A',
         profession: participant.profession || 'N/A'
       }
     };
-
+    
     res.status(200).json({ participant: enhancedParticipant });
   });
 };
