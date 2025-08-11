@@ -48,13 +48,22 @@ exports.getProfessionalReport = (req, res) => {
 
 
 // ✅ Get ALL Guardians
+// ✅ Get ALL Guardians - FIXED VERSION
 exports.getGuardianReport = (req, res) => {
     const query = `
         SELECT 
-            u.id AS guardian_id, u.first_name, u.last_name AS guardian_name, u.email, 
+            u.id AS guardian_id, 
+            CONCAT(u.first_name, ' ', u.last_name) AS guardian_name, 
+            u.email, 
             COUNT(DISTINCT hr.id) AS total_help_requests,
             COUNT(DISTINCT rp.id) AS total_guardian_participants,
-            rp.id AS participant_id, rp.first_name AS participant_name, rp.gender, rp.age, rp.condition, rp.status
+            rp.id AS participant_id, 
+            rp.first_name AS participant_first_name,
+            rp.last_name AS participant_last_name,
+            rp.gender, 
+            rp.age, 
+            rp.condition, 
+            rp.status
         FROM users u
         LEFT JOIN help_requests hr ON u.id = hr.guardian_id
         LEFT JOIN rehab_participants rp ON u.id = rp.guardian_id
@@ -77,14 +86,15 @@ exports.getGuardianReport = (req, res) => {
                     email: row.email,
                     total_help_requests: row.total_help_requests,
                     total_guardian_participants: row.total_guardian_participants,
-                    participants: [] // ✅ Store participants in an array
+                    participants: []
                 };
             }
 
             if (row.participant_id) {
                 guardians[row.guardian_id].participants.push({
                     id: row.participant_id,
-                    name: row.participant_name,
+                    first_name: row.participant_first_name,
+                    last_name: row.participant_last_name,
                     gender: row.gender,
                     age: row.age,
                     condition: row.condition,
