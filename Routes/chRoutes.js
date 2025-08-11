@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const chapterController = require('../controllers/chapterController');
+const chapterController = require('../controllers/ChapterController');
 
 // Create a new chapter
 router.post('/chapters', chapterController.createChapter);

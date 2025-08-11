@@ -55,20 +55,31 @@ exports.updateChapter = (req, res) => {
 };
 
 // Delete Chapter
+// Delete Chapter with all related progress
 exports.deleteChapter = (req, res) => {
     const { id } = req.params;
 
-    const query = 'DELETE FROM chapters WHERE id = ?';
-
-    db.query(query, [id], (err) => {
+    // First delete all chapter progress records for this chapter
+    const deleteProgressQuery = 'DELETE FROM chapter_progress WHERE chapter_id = ?';
+    
+    db.query(deleteProgressQuery, [id], (err) => {
         if (err) {
-            console.error('Error deleting chapter:', err);
-            return res.status(500).json({ error: 'Error deleting chapter' });
+            console.error('Error deleting chapter progress:', err);
+            return res.status(500).json({ error: 'Error deleting chapter progress' });
         }
-        res.status(200).json({ message: 'Chapter deleted successfully' });
+
+        // Then delete the chapter
+        const deleteChapterQuery = 'DELETE FROM chapters WHERE id = ?';
+        
+        db.query(deleteChapterQuery, [id], (err) => {
+            if (err) {
+                console.error('Error deleting chapter:', err);
+                return res.status(500).json({ error: 'Error deleting chapter' });
+            }
+            res.status(200).json({ message: 'Chapter deleted successfully' });
+        });
     });
 };
-
 // Get Chapter Progress (for Admin)
 exports.getChapterProgress = (req, res) => {
     const { program_id } = req.params;
